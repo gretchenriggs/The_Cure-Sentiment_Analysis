@@ -6,17 +6,16 @@ from pymongo import MongoClient
 
 # Creating band's url page name on azlyrics.com
 def band_url_generator(band):
-    # Format band name to be all lower case and if band name starts with
-    # "the", remove it
-    band = band.lower()
+    # If band name starts with "the", remove it
     if band.split(" ")[0] == "the":
         band = band[4:]
 
-        # Generate band_url for page on azlyrics.com containing all band's
-        #   songs
-        band_url = "http://www.azlyrics.com/[first_letter]/[band].html"
-        band_url = band_url.replace("[first_letter]", band[0])\
-        .replace('[band]', band)
+    # Generate band_url for page on azlyrics.com containing all band's
+    #   songs
+    band_url = "http://www.azlyrics.com/[first_letter]/[band].html"
+    band_url = band_url.replace("[first_letter]", band[0])\
+                       .replace('[band]', band)\
+                       .replace(" ", "")
     return band_url
 
 def song_list_generator(band_url):
@@ -27,30 +26,37 @@ def song_list_generator(band_url):
     # Make a request to the host
     response  = http.request('GET', band_url)
 
-    # Using BeautifulSoup to store band_url page as lxml
-    soup  = bs(response.data, "lxml")
+    # If request succeeded, proceed with song list generation
+    if response.status == 200:
 
-    # Find all song listings on the page
-    song_list = soup.findAll("a")[31:][:-10 or None]
+        # Using BeautifulSoup to store band_url page as lxml
+        soup  = bs(response.data, "lxml")
 
-    # Convert individual songs from BeautifulSoup objects to strings
-    song_list = [str(i) for i in song_list]
+        # Find all song listings on the page
+        song_list = soup.findAll("a")[31:][:-10 or None]
 
-    # Removing unneeded text from song listings and saving to temporary list
-    temp = []
-    for song in song_list:
-        if '<a href="../lyrics/' in song:
-            song = song.replace("</a>", " ")\
-            .split(" ")[1]\
-            .replace('href="../lyrics/', '')\
-            .replace(band, "")\
-            .replace("/", "")\
-            .replace('.html"', '')
-            temp.append(song)
+        # Convert individual songs from BeautifulSoup objects to strings
+        song_list = [str(i) for i in song_list]
 
-    # Copying temporary list back to song_list
-    song_list = temp
-    return song_list
+        # Removing unneeded text from song listings and saving to temporary list
+        temp = []
+        for song in song_list:
+            if '<a href="../lyrics/' in song:
+                song = song.replace("</a>", " ")\
+                .split(" ")[1]\
+                .replace('href="../lyrics/', '')\
+                .replace(band, "")\
+                .replace("/", "")\
+                .replace('.html"', '')
+                temp.append(song)
+
+        # Copying temporary list back to song_list
+        song_list = temp
+        return song_list
+
+    # If request not successful, print error message to screen
+    else:
+        print "URLError: The server could not be found!"
 
 
 def scrape_lyrics(band, song_list):
@@ -64,31 +70,46 @@ def scrape_lyrics(band, song_list):
         lyrics_url = lyrics_url.replace("[band]", band)\
                                .replace('[song]', song)
 
+        # Creating a PoolManager, which is an abstraction for a container for a
+        #   collection of connections to the host
+        http = urllib3.PoolManager()
+
         # Make a request to the host
         response  = http.request('GET', lyrics_url)
 
-        # Using BeautifulSoup to store band_url page as lxml
-        lyrics_soup  = bs(response.data, "lxml")
+        # If request succeeded, proceed with lyric scraping
+        if response.status == 200:
 
-        # Find all song lyrics on the page
-        lyrics = lyrics_soup.findAll("div", attrs={"class": None, "id": None})
+            # Using BeautifulSoup to store band_url page as lxml
+            lyrics_soup  = bs(response.data, "lxml")
 
-        # Removing unneeded text from lyric listing
-        lyrics = str(lyrics).replace("[<div>\\n<!-- Usage of azlyrics.com content by any third-party lyrics provider is prohibited by our licensing agreement. Sorry about that. -->", "")\
-                            .replace("\\r\\n", " ")\
-                            .replace("<br / >"," ")\
-                            .replace("<br/>", " ")\
-                            .replace("\\n", " ")\
-                            .replace("</div>]", "")\
-                            .replace("  ", " ")\
-                            .lower()
+            # Find all song lyrics on the page
+            lyrics = lyrics_soup.findAll("div", attrs={"class": None, \
+                                                          "id": None})
 
-        # Format song and lyrics pymongo-style
-        song_lyrics = {song: lyrics}
+            # Removing unneeded text from lyric listing
+            lyrics = str(lyrics).replace("[<div>\\n<!-- Usage of azlyrics.com content by any third-party lyrics provider is prohibited by our licensing agreement. Sorry about that. -->", "")\
+                                .replace("\\r\\n", " ")\
+                                .replace("<br / >"," ")\
+                                .replace("<br/>", " ")\
+                                .replace("\\n", " ")\
+                                .replace("</div>]", "")\
+                                .replace("  ", " ")\
+                                .lower()
 
-        # Insert song and lyrics into mongo database
-        db_insert_lyrics(database_name, collection_name, song_lyrics)
+            # Format song and lyrics pymongo-style
+            song_lyrics = {song: lyrics}
 
+            # Insert song and lyrics into mongo database
+            db_insert_lyrics(database_name, collection_name, song_lyrics)
+
+        else:
+            error_message = "Lyrics could not be found"
+            db_insert_lyrics(database_name, collection_name, error_message)
+
+    # return collection for further QC
+    collection = connect_to_mongo(database_name, collection_name)
+    return collection
 
 
 def connect_to_mongo(database_name, collection_name):
@@ -107,12 +128,13 @@ def db_insert_lyrics(database_name, collection_name, lyrics):
     collection = connect_to_mongo(database_name,collection_name)
 
     # Insert new song lyrics into mongo database
-    collection.insert_one(song)
+    collection.insert_one(lyrics)
 
 
 if __name__ == '__main__':
     # Prompt user for band name
     band = raw_input("Enter a band name: ")
+    band = band.lower().replace(" ", "")
 
     # Calling function to create band url for azlyrics.com
     band_url = band_url_generator(band)
@@ -122,4 +144,4 @@ if __name__ == '__main__':
 
     # Scraping song lyrics from azlyrics.com and inserting into mongo
     #   database
-    all_lyrics = scrape_lyrics(band, song_list)
+    collection = scrape_lyrics(band, song_list)

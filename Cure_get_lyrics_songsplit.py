@@ -51,72 +51,110 @@ def song_list_generator(era_list):
             # Using BeautifulSoup to store parse html from era_url page
             soup = bs(response.data, 'html.parser')
 
-            # Find all song listings on the page
-            song_list = soup.findAll("h3")[1:]
+            # # Find all song listings on the page
+            # song_list = soup.findAll("h3")[1:]
+            #
+            # # Convert individual songs from BeautifulSoup objects to strings
+            # song_list = [str(i) for i in song_list]
+            #
+            # # Removing unneeded text from song listings and saving to temporary list
+            # temp = []
+            # for song in song_list:
+            #     song = song.replace("<h3>", "")\
+            #                .replace("</h3>", "")
+            #     temp.append(song)
+            #
+            # # Copying temporary list back to song_list
+            # all_song_list.append(temp)
 
-            # Convert individual songs from BeautifulSoup objects to strings
-            song_list = [str(i) for i in song_list]
+            # Creating mongo database_name & collection_name
+            database_name = 'The_Cure'
+            collection_name = 'lyrics'
 
-            # Removing unneeded text from song listings and saving to temporary list
-            temp = []
-            for song in song_list:
-                song = song.replace("<h3>", "")\
-                           .replace("</h3>", "")
-                temp.append(song)
+            # Check if database is already populated (non-empty)
+            collection = connect_to_mongo(database_name, collection_name)
+            if collection.find() != None:
 
-            # Copying temporary list back to song_list
-            all_song_list.append(temp)
+                raw_song_with_lyrics = []
+                temp = soup.get_text().split("\n \n")[2:-4]
+                for item in temp:
+    #                raw_song_with_lyrics.append(item)
 
-            # Call function to grab lyrics to put into MongoDB
-            collection = scrape_lyrics(era, era_url, soup)
+                    reformated_song_lyrics = str(temp[0]).replace(" \n\n\n{0}\n\nAll Robert's words to all The Cure songs and more...\n\n\n"\
+                           .format(era),"")\
+                           .replace("[The Smith / Dempsey / Tolhurst Cure]\n", "")\
+                           .replace("\r", "")\
+                           .split("\n")
 
-            # Sleep a bit so don't get kicked out of website
-            sleep(5)
+                    song = reformated_song_lyrics[0]
+                    lyrics = reformated_song_lyrics[1:]
+                    lyrics = " ".join(lyrics).lower()\
+                                .replace("  ", " ")\
+                                .replace("  ", " ")
+
+                    # Format song and lyrics pymongo-style
+                    all_lyrics = {'_era' : era,\
+                                  '_song': song, \
+                                  '_lyrics' : lyrics}
+
+
+                    # Insert song and lyrics into mongo database
+                    db_insert_lyrics(database_name, collection_name, all_lyrics)
+
+                    # return collection for further QC
+                    collection = connect_to_mongo(database_name,\
+                                                  collection_name)
+
+
+                # Call function to grab lyrics to put into MongoDB
+            #    collection = scrape_lyrics(era, era_url, soup)
+
+                # Sleep a bit so don't get kicked out of website
+                #sleep(5)
 
         # If request not successful, print error message to screen
+
+
         else:
             print "URLError: The server could not be found!"
 
     all_song_list = [item for sublist in all_song_list for item in sublist]
     return all_song_list, collection
 
-
-def scrape_lyrics(era, era_url, soup):
-    ''' Scraping lyrics from all songs listed for The Cure on thecure.com
-        Input:  era           string, list of years for era
-                era_url_list  list of strings, list of url lists for eras
-        Output: collection    MongoDB, containing lyrics only
-    '''
-    # Creating mongo database_name & collection_name
-    database_name = 'The_Cure'
-    collection_name = 'lyrics'
-
-    # Check if database is already populated (non-empty)
-    collection = connect_to_mongo(database_name, collection_name)
-    if collection.find() != None:
-        # Find all song lyrics on the page
-        lyrics = soup.findAll("p")
-
-        # Removing unneeded text from lyric listing
-        lyrics = str(lyrics).replace("\\r\\n", " ")\
-                            .replace("</br>"," ")\
-                            .replace("<br>", " ")\
-                            .replace("\\n", " ")\
-                            .replace("</div>]", "")\
-                            .replace("  ", " ")\
-                            .replace("  ", " ")\
-                            .replace("  ", " ")\
-                            .replace("<p>", "")\
-                            .replace("&amp;amp;amp;hellip;", "")\
-                            .replace("</p>", "")\
-                            .replace("\'", "")\
-                            .replace('"', "")\
-                            .replace(",", "")\
-                            .replace(".", "")\
-                            .replace("?", "")\
-                            .replace("!", "")\
-                            .lower()
-
+#
+# def scrape_lyrics(era, era_url, soup):
+#     ''' Scraping lyrics from all songs listed for The Cure on thecure.com
+#         Input:  era           string, list of years for era
+#                 era_url_list  list of strings, list of url lists for eras
+#         Output: collection    MongoDB, containing lyrics only
+#     '''
+#     # Creating mongo database_name & collection_name
+#     database_name = 'The_Cure'
+#     collection_name = 'lyrics'
+#
+#     # Check if database is already populated (non-empty)
+#     collection = connect_to_mongo(database_name, collection_name)
+#     if collection.find() != None:
+#         # Find all song lyrics on the page
+#         lyrics = soup.findAll("p")
+#
+#         # Removing unneeded text from lyric listing
+#         lyrics = str(lyrics).replace("\\r\\n", " ")\
+#                             .replace("</br>"," ")\
+#                             .replace("<br>", " ")\
+#                             .replace("\\n", " ")\
+#                             .replace("</div>]", "")\
+#                             .replace("  ", " ")\
+#                             .replace("&amp;amp;amp;hellip;", "")\
+#                             .replace("</p>", "")\
+#                             .replace("\'", "")\
+#                             .replace('"', "")\
+#                             .replace(",", "")\
+#                             .replace(".", "")\
+#                             .replace("?", "")\
+#                             .replace("!", "")\
+#                             .lower()
+#
         # Format song and lyrics pymongo-style
         all_lyrics = {'_era' : era, '_lyrics' : lyrics}
 

@@ -68,7 +68,7 @@ def song_list_generator(era_list):
             all_song_list.append(temp)
 
             # Call function to grab lyrics to put into MongoDB
-            scrape_lyrics(era, era_url, soup)
+            collection = scrape_lyrics(era, era_url, soup)
 
             # Sleep a bit so don't get kicked out of website
             sleep(5)
@@ -78,7 +78,7 @@ def song_list_generator(era_list):
             print "URLError: The server could not be found!"
 
     all_song_list = [item for sublist in all_song_list for item in sublist]
-    return all_song_list
+    return all_song_list, collection
 
 
 
@@ -115,18 +115,12 @@ def scrape_lyrics(era, era_url, soup):
                         .replace("!", "")\
                         .lower()
 
-        # Format song and lyrics pymongo-style
-        all_lyrics = {era : lyrics}
+    # Format song and lyrics pymongo-style
+    all_lyrics = {era : lyrics}
 
-        # Insert song and lyrics into mongo database
-        db_insert_lyrics(database_name, collection_name, all_lyrics)
+    # Insert song and lyrics into mongo database
+    db_insert_lyrics(database_name, collection_name, all_lyrics)
 
-    else:
-        error_message = "Lyrics could not be found"
-        db_insert_lyrics(database_name, collection_name, song, \
-                         error_message)
-
-    sleep(5)
     # return collection for further QC
     collection = connect_to_mongo(database_name, collection_name)
     return collection

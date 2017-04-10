@@ -7,88 +7,86 @@ from time import sleep
 import pandas as pd
 
 
-def band_url_generator(era_list):
-    ''' Creating band's url page name on azlyrics.com
+def era_url_generator(era_list):
+    ''' Creating The Cure's era for lyrics url page name on thecure.com
         Input:  band      string, raw input from user
         Output: band      string, reformatted band name
-                band_url  string, band url on azlyrics.com
+                era_url  string, band url on azlyrics.com
     '''
-    # Format band name as lower case with no space and if band name starts
-    #   with "the", remove it
-    band = band.lower()
-    if band.split(" ")[0] == "the":
-        band = band[4:]
-    band = band.replace(" ", "")
-    # Generate band_url for page on azlyrics.com containing all band's
+
+    # Generate era_url list for pages on thecure.com containing all band's
     #   songs
-    band_url = "http://www.azlyrics.com/[first_letter]/[band].html"
-    band_url = band_url.replace("[first_letter]", band[0])\
-                       .replace('[band]', band)\
-                       .replace(" ", "")
-    return band, band_url
+    era_url_list = []
+    for era in era_list:
+        era_url = "http://www.thecure.com/words/[era]/"
+        era_url = era_url.replace("[era]", era)
+        era_url_list.append(era_url)
+    return era_url_list
 
 
-def song_list_generator(band_url):
-    ''' Creating list of songs for band from azlyrics.com
-        Input: band_url     string, url for band on azlyrics.com
-        Output: song_list   list of strings, list containing all songs with
-                                  lyrics for specified band on azlyrics.com
+def song_list_generator(era_url_list):
+    ''' Creating list of songs for The Cure from thecure.com
+        Input: era_url_list     list of strings, urls for eras on thecure.com
+        Output: song_list       list of strings, list containing all songs with
+                                  lyrics for The Cure on thecure.com
     '''
-    # Creating a PoolManager, which is an abstraction for a container for a
-    #   collection of connections to the host
-    http = urllib3.PoolManager()
+    all_song_list = []
+    for era_url in era_url_list:
+        # Creating a PoolManager, which is an abstraction for a container for a
+        #   collection of connections to the host
+        http = urllib3.PoolManager()
 
-    # Make a request to the host
-    response  = http.request('GET', band_url)
+        # Make a request to the host
+        response  = http.request('GET', era_url)
 
-    # If request succeeded, proceed with song list generation
-    if response.status == 200:
+        # If request succeeded, proceed with song list generation
+        if response.status == 200:
 
-        # Using BeautifulSoup to store band_url page as lxml
-        soup  = bs(response.data, "lxml")
+            # Using BeautifulSoup to store parse html from era_url page
+            soup = bs(response.data, 'html.parser')
 
-        # Find all song listings on the page
-        song_list = soup.findAll("a")[31:][:-10 or None]
+            # Find all song listings on the page
+            song_list = soup.findAll("h3")[1:]
 
-        # Convert individual songs from BeautifulSoup objects to strings
-        song_list = [str(i) for i in song_list]
+            # Convert individual songs from BeautifulSoup objects to strings
+            song_list = [str(i) for i in song_list]
 
-        # Removing unneeded text from song listings and saving to temporary list
-        temp = []
-        for song in song_list:
-            if '<a href="../lyrics/' in song:
-                song = song.replace("</a>", " ")\
-                .split(" ")[1]\
-                .replace('href="../lyrics/', '')\
-                .replace(band, "")\
-                .replace("/", "")\
-                .replace('.html"', '')
+            # Removing unneeded text from song listings and saving to temporary list
+            temp = []
+            for song in song_list:
+                song = song.replace("<h3>", "")\
+                           .replace("</h3>", "")
                 temp.append(song)
 
-        # Copying temporary list back to song_list
-        song_list = temp
-        return song_list
+            # Copying temporary list back to song_list
+            all_song_list.append(temp)
 
-    # If request not successful, print error message to screen
-    else:
-        print "URLError: The server could not be found!"
+            # Call function to grab lyrics to put into MongoDB
+            scrape_lyrics(era_url_list)
+
+            # Sleep a bit so don't get kicked out of website
+            sleep(5)
+
+        # If request not successful, print error message to screen
+        else:
+            print "URLError: The server could not be found!"
+
+    all_song_list = [item for sublist in all_song_list for item in sublist]
+    return all_song_list
 
 
-def scrape_lyrics(band, song_list):
-    ''' Scraping lyrics from all songs listed for band on azlyrics.com
-        Input: band          string, band name
-               song_list     list of strings, list of song names
-        Output: collection   MongoDB, containing song names and lyrics
+
+def scrape_lyrics(era_url_list):
+    ''' Scraping lyrics from all songs listed for The Cure on thecure.com
+        Input:  era_url_list  list of strings, list of url lists for eras
+        Output: collection    MongoDB, containing lyrics only
     '''
     # Creating mongo database_name & collection_name
-    database_name = band +'_lyrics'
+    database_name = 'The_Cure'
     collection_name = 'lyrics'
 
     # Loop through to get some lyrics for each song
-    for song in song_list:
-        lyrics_url = "http://www.azlyrics.com/lyrics/[band]/[song].html"
-        lyrics_url = lyrics_url.replace("[band]", band)\
-                               .replace('[song]', song)
+    for era in era_url_list:
 
         # Creating a PoolManager, which is an abstraction for a container for a
         #   collection of connections to the host
@@ -112,7 +110,7 @@ def scrape_lyrics(band, song_list):
         # If request succeeded, proceed with lyric scraping
         if response.status == 200:
 
-            # Using BeautifulSoup to store band_url page as lxml
+            # Using BeautifulSoup to store era_url page as lxml
             lyrics_soup  = bs(response.data, "lxml")
 
             # Find all song lyrics on the page
@@ -215,10 +213,10 @@ if __name__ == '__main__':
     era_list = ['1978-1979', '1980', '1981-1982', '1983-1984', '1985-1987', '1988-1990', '1991-1993', '1994-2004', '2005-2009']
 
     # Calling function to create band url for thecure.com
-    band_url = band_url_generator(band)
+    era_url_list = era_url_generator(era_list)
 
     # Calling function to create song lyric url for azlyrics.com
-    song_list = song_list_generator(band_url)
+    song_list = song_list_generator(era_url_list)
 
     # Scraping song lyrics from azlyrics.com and inserting into mongo
     #   database
@@ -226,3 +224,7 @@ if __name__ == '__main__':
 
     # Outputting lyrics to csv file
     # lyrics_to_csv(collection, band)
+
+''' Mongo code to join albums to songs
+db.albums.aggregate([ {$lookup:      {       from: 'songs',       localField: 'song',       foreignField: 'song',       as: 'song'      } } ]).pretty()
+'''

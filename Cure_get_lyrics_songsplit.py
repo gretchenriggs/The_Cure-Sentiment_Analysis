@@ -6,6 +6,11 @@ import sys
 from time import sleep
 import pandas as pd
 
+def get_era_list():
+
+
+str(soup.findAll("a")[10]).split("=")[1].replace('.aspx"><img border','').replace('"',"")
+
 
 def era_url_generator(era_list):
     ''' Creating The Cure's era for lyrics url page name on thecure.com
@@ -82,7 +87,8 @@ def song_list_generator(era_list):
 
                     reformated_song_lyrics = str(temp[0]).replace(" \n\n\n{0}\n\nAll Robert's words to all The Cure songs and more...\n\n\n"\
                            .format(era),"")\
-                           .replace("[The Smith / Dempsey / Tolhurst Cure]\n", "")\
+                           .replace("[lineup]\n".replace("lineup", lineup), "")\
+                           .replace('')\
                            .replace("\r", "")\
                            .split("\n")
 
@@ -109,17 +115,14 @@ def song_list_generator(era_list):
                 # Call function to grab lyrics to put into MongoDB
             #    collection = scrape_lyrics(era, era_url, soup)
 
-                # Sleep a bit so don't get kicked out of website
-                #sleep(5)
+            # Sleep a bit so don't get kicked out of website
+            sleep(5)
 
-        # If request not successful, print error message to screen
+            # If request not successful, print error message to screen
+            # else:
+            #     print "URLError: The server could not be found!"
 
-
-        else:
-            print "URLError: The server could not be found!"
-
-    all_song_list = [item for sublist in all_song_list for item in sublist]
-    return all_song_list, collection
+    return collection
 
 #
 # def scrape_lyrics(era, era_url, soup):
@@ -156,17 +159,15 @@ def song_list_generator(era_list):
 #                             .lower()
 #
         # Format song and lyrics pymongo-style
-        all_lyrics = {'_era' : era, '_lyrics' : lyrics}
-
-        # Insert song and lyrics into mongo database
-        db_insert_lyrics(database_name, collection_name, all_lyrics)
-
-        # return collection for further QC
-        collection = connect_to_mongo(database_name, collection_name)
-
-    # In either case, if database is already populated or if just populated
-    #   in this function, return collection containing lyrics
-    return collection
+    #     all_lyrics = {'_era' : era, '_lyrics' : lyrics}
+    #
+    #     # Insert song and lyrics into mongo databaseThe Smith / Dempsey / Tolhurst Cure
+    #     # return collection for further QC
+    #     collection = connect_to_mongo(database_name, collection_name)
+    #
+    # # In either case, if database is already populated or if just populated
+    # #   in this function, return collection containing lyrics
+    # return collection
 
 
 
@@ -226,18 +227,15 @@ def db_insert_lyrics(database_name, collection_name, all_lyrics):
 #     # Run the lyrics through spaCy
 #     # Lemmatize lyrics
 #     tokens = [token.lemma_ for token in lyrics]
-#
-#     return ' '.join(word for word in tokens if word not in stop_words)
-
-
-if __name__ == '__main__':
-    # Using The Cure's official website to grab song lyrics (azlyrics.com keeps
+#cs.com keeps
     #   kicking me out for too many requests)
     era_list = ['1978-1979', '1980', '1981-1982', '1983-1984', '1985-1987', '1988-1990', '1991-1993', '1994-2004', '2005-2009']
 
+    lineup_list = get_lineup(era_list)
+
     # Calling function to create song list from thecure.com & store lyrics
     #   in MongoDB database by era : all_lyrics
-    song_list, collection = song_list_generator(era_list)
+    collection = song_list_generator(era_list)
 
     # Scraping song lyrics from azlyrics.com and inserting into mongo
     #   database

@@ -6,11 +6,6 @@ import sys
 from time import sleep
 import pandas as pd
 
-def get_era_list():
-
-
-str(soup.findAll("a")[10]).split("=")[1].replace('.aspx"><img border','').replace('"',"")
-
 
 def era_url_generator(era_list):
     ''' Creating The Cure's era for lyrics url page name on thecure.com
@@ -39,6 +34,7 @@ def song_list_generator(era_list):
     era_url_list = era_url_generator(era_list)
 
     all_song_list = []
+    lineup_list = []
     for index, era_url in enumerate(era_url_list):
         # Saving era listing to 'era'
         era = era_list[index]
@@ -56,22 +52,6 @@ def song_list_generator(era_list):
             # Using BeautifulSoup to store parse html from era_url page
             soup = bs(response.data, 'html.parser')
 
-            # # Find all song listings on the page
-            # song_list = soup.findAll("h3")[1:]
-            #
-            # # Convert individual songs from BeautifulSoup objects to strings
-            # song_list = [str(i) for i in song_list]
-            #
-            # # Removing unneeded text from song listings and saving to temporary list
-            # temp = []
-            # for song in song_list:
-            #     song = song.replace("<h3>", "")\
-            #                .replace("</h3>", "")
-            #     temp.append(song)
-            #
-            # # Copying temporary list back to song_list
-            # all_song_list.append(temp)
-
             # Creating mongo database_name & collection_name
             database_name = 'The_Cure'
             collection_name = 'lyrics'
@@ -80,19 +60,21 @@ def song_list_generator(era_list):
             collection = connect_to_mongo(database_name, collection_name)
             if collection.find() != None:
 
+                lineup = str(soup.findAll("h4")[1])\
+                             .replace("<h4>[", "")\
+                             .replace("Cure]</h4>", "")
                 raw_song_with_lyrics = []
                 temp = soup.get_text().split("\n \n")[2:-4]
                 for item in temp:
-    #                raw_song_with_lyrics.append(item)
-
                     reformated_song_lyrics = str(temp[0]).replace(" \n\n\n{0}\n\nAll Robert's words to all The Cure songs and more...\n\n\n"\
                            .format(era),"")\
                            .replace("[lineup]\n".replace("lineup", lineup), "")\
-                           .replace('')\
                            .replace("\r", "")\
                            .split("\n")
 
-                    song = reformated_song_lyrics[0]
+                    song = str(soup.findAll("h3")[index+1])\
+                                   .replace("<h3>", "")\
+                                   .replace("</h3>", "")
                     lyrics = reformated_song_lyrics[1:]
                     lyrics = " ".join(lyrics).lower()\
                                 .replace("  ", " ")\
@@ -101,13 +83,14 @@ def song_list_generator(era_list):
                     # Format song and lyrics pymongo-style
                     all_lyrics = {'_era' : era,\
                                   '_song': song, \
-                                  '_lyrics' : lyrics}
+                                  '_lyrics' : lyrics, \
+                                  '_lineup' : lineup}
 
 
                     # Insert song and lyrics into mongo database
                     db_insert_lyrics(database_name, collection_name, all_lyrics)
 
-                    # return collection for further QC
+                    # Return collection for further QC
                     collection = connect_to_mongo(database_name,\
                                                   collection_name)
 
@@ -202,36 +185,10 @@ def db_insert_lyrics(database_name, collection_name, all_lyrics):
     collection.insert_one(all_lyrics)
 
 
-# # def lyrics_to_csv(collection, band, query=None):
-#     ''' Output lyric collection for band to csv file
-#         Input: collection   string, MongoDB collection name to write out to csv
-#                band         string, band name
-#                query        Should the collection first be queried?
-#         Output: None, write out lyrics df to csv file for later importation
-#                       into sentiment analysis python script
-#     '''
-#     if query == None:
-#         query = collection.find()
-#
-#     # Put mongo database into a dataframe and output to csv file
-#     df =  pd.DataFrame(list(query))
-#
-#     # Outputting df to csv
-#     df.to_csv('{}_lyrics.csv'.format(band))
-
-
-# def lemmatize_lyrics(lyrics, stop_words):
-#     # Remove punctutation
-#     lyrics = unicode(lyrics.translate(None, punctutation))
-#
-#     # Run the lyrics through spaCy
-#     # Lemmatize lyrics
-#     tokens = [token.lemma_ for token in lyrics]
-#cs.com keeps
+if __name__ == '__main__':
+    # Using The Cure's official website to grab song lyrics (azlyrics.com keeps
     #   kicking me out for too many requests)
     era_list = ['1978-1979', '1980', '1981-1982', '1983-1984', '1985-1987', '1988-1990', '1991-1993', '1994-2004', '2005-2009']
-
-    lineup_list = get_lineup(era_list)
 
     # Calling function to create song list from thecure.com & store lyrics
     #   in MongoDB database by era : all_lyrics

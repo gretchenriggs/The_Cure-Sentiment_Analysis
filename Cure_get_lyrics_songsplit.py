@@ -65,14 +65,14 @@ def song_list_generator(era_list):
                              .replace("Cure]</h4>", "")
                 raw_song_with_lyrics = []
                 temp = soup.get_text().split("\n \n")[2:-4]
-                for item in temp:
+                for i, item in enumerate(temp):
                     reformated_song_lyrics = str(temp[0]).replace(" \n\n\n{0}\n\nAll Robert's words to all The Cure songs and more...\n\n\n"\
                            .format(era),"")\
                            .replace("[lineup]\n".replace("lineup", lineup), "")\
                            .replace("\r", "")\
                            .split("\n")
 
-                    song = str(soup.findAll("h3")[index+1])\
+                    song = str(soup.findAll("h3")[i+1])\
                                    .replace("<h3>", "")\
                                    .replace("</h3>", "")
                     lyrics = reformated_song_lyrics[1:]
@@ -86,6 +86,8 @@ def song_list_generator(era_list):
                                   '_lyrics' : lyrics, \
                                   '_lineup' : lineup}
 
+                    print era, song
+
 
                     # Insert song and lyrics into mongo database
                     db_insert_lyrics(database_name, collection_name, all_lyrics)
@@ -95,63 +97,14 @@ def song_list_generator(era_list):
                                                   collection_name)
 
 
-                # Call function to grab lyrics to put into MongoDB
-            #    collection = scrape_lyrics(era, era_url, soup)
+            # If request not successful, print error message to screen
+            else:
+                print "URLError: The server could not be found!"
 
             # Sleep a bit so don't get kicked out of website
             sleep(5)
 
-            # If request not successful, print error message to screen
-            # else:
-            #     print "URLError: The server could not be found!"
-
     return collection
-
-#
-# def scrape_lyrics(era, era_url, soup):
-#     ''' Scraping lyrics from all songs listed for The Cure on thecure.com
-#         Input:  era           string, list of years for era
-#                 era_url_list  list of strings, list of url lists for eras
-#         Output: collection    MongoDB, containing lyrics only
-#     '''
-#     # Creating mongo database_name & collection_name
-#     database_name = 'The_Cure'
-#     collection_name = 'lyrics'
-#
-#     # Check if database is already populated (non-empty)
-#     collection = connect_to_mongo(database_name, collection_name)
-#     if collection.find() != None:
-#         # Find all song lyrics on the page
-#         lyrics = soup.findAll("p")
-#
-#         # Removing unneeded text from lyric listing
-#         lyrics = str(lyrics).replace("\\r\\n", " ")\
-#                             .replace("</br>"," ")\
-#                             .replace("<br>", " ")\
-#                             .replace("\\n", " ")\
-#                             .replace("</div>]", "")\
-#                             .replace("  ", " ")\
-#                             .replace("&amp;amp;amp;hellip;", "")\
-#                             .replace("</p>", "")\
-#                             .replace("\'", "")\
-#                             .replace('"', "")\
-#                             .replace(",", "")\
-#                             .replace(".", "")\
-#                             .replace("?", "")\
-#                             .replace("!", "")\
-#                             .lower()
-#
-        # Format song and lyrics pymongo-style
-    #     all_lyrics = {'_era' : era, '_lyrics' : lyrics}
-    #
-    #     # Insert song and lyrics into mongo databaseThe Smith / Dempsey / Tolhurst Cure
-    #     # return collection for further QC
-    #     collection = connect_to_mongo(database_name, collection_name)
-    #
-    # # In either case, if database is already populated or if just populated
-    # #   in this function, return collection containing lyrics
-    # return collection
-
 
 
 def connect_to_mongo(database_name, collection_name):

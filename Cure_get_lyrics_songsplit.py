@@ -24,7 +24,7 @@ def era_url_generator(era_list):
     return era_url_list
 
 
-def song_list_generator(era_list):
+def song_list_generator(era_list, query=True):
     ''' Creating list of songs for The Cure from thecure.com
         Input: era_url_list     list of strings, urls for eras on thecure.com
         Output: song_list       list of strings, list containing all songs with
@@ -33,40 +33,40 @@ def song_list_generator(era_list):
     # Calling function to create band url for thecure.com
     era_url_list = era_url_generator(era_list)
 
-    all_song_list = []
-    lineup_list = []
-    for index, era_url in enumerate(era_url_list):
-        # Saving era listing to 'era'
-        era = era_list[index]
+    # Creating mongo database_name & collection_name
+    database_name = 'The_Cure'
+    collection_name = 'lyrics'
 
-        # Creating a PoolManager, which is an abstraction for a container for a
-        #   collection of connections to the host
-        http = urllib3.PoolManager()
+    # Check if database is already populated (non-empty)
+    collection = connect_to_mongo(database_name, collection_name)
 
-        # Make a request to the host
-        response  = http.request('GET', era_url)
+    if list(collection.find()) == []:
+        all_song_list = []
+        lineup_list = []
+        for index, era_url in enumerate(era_url_list):
+            # Saving era listing to 'era'
+            era = era_list[index]
 
-        # If request succeeded, proceed with song list generation
-        if response.status == 200:
+            # Creating a PoolManager, which is an abstraction for a container for a collection of connections to the host
+            http = urllib3.PoolManager()
 
-            # Using BeautifulSoup to store parse html from era_url page
-            soup = bs(response.data, 'html.parser')
+            # Make a request to the host
+            response  = http.request('GET', era_url)
 
-            # Creating mongo database_name & collection_name
-            database_name = 'The_Cure'
-            collection_name = 'lyrics'
+            # If request succeeded, proceed with song list generation
+            if response.status == 200:
 
-            # Check if database is already populated (non-empty)
-            collection = connect_to_mongo(database_name, collection_name)
-            if collection.find() != None:
+                # Using BeautifulSoup to store parse html from era_url page
+                soup = bs(response.data, 'html.parser')
 
                 lineup = str(soup.findAll("h4")[1])\
                              .replace("<h4>[", "")\
-                             .replace("Cure]</h4>", "")
+                             .replace(" Cure]</h4>", "")
                 raw_song_with_lyrics = []
                 temp = soup.get_text().split("\n \n")[2:-4]
                 for i, item in enumerate(temp):
-                    reformated_song_lyrics = str(temp[0]).replace(" \n\n\n{0}\n\nAll Robert's words to all The Cure songs and more...\n\n\n"\
+                    reformated_song_lyrics = str(temp[i].encode("ascii", "ignore"))\
+                           .replace(" \n\n\n{0}\n\nAll Robert's words to all The Cure songs and more...\n\n\n"\
                            .format(era),"")\
                            .replace("[lineup]\n".replace("lineup", lineup), "")\
                            .replace("\r", "")\
@@ -86,7 +86,9 @@ def song_list_generator(era_list):
                                   '_lyrics' : lyrics, \
                                   '_lineup' : lineup}
 
+                    print i, item
                     print era, song
+                    print lyrics
 
 
                     # Insert song and lyrics into mongo database
@@ -97,7 +99,7 @@ def song_list_generator(era_list):
                                                   collection_name)
 
 
-            # If request not successful, print error message to screen
+                # If request not successful, print error message to screen
             else:
                 print "URLError: The server could not be found!"
 

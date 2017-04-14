@@ -58,18 +58,32 @@ def album_song_list_generator(soup):
                              .lower() for album in albums]
 
         album_song_dict = defaultdict(list)
-    #    songs = songs[1:]
         j = 0
         for song in songs:
             if "href" in str(song):
                 song = str(song).split(">")[1]\
                 .replace("</a","")\
                 .lower()
-                print albums[j], song
+                print albums[j], year[j], song
                 album_song_dict[albums[j]].append(song)
+
+                # Format song and lyrics pymongo-style
+                all_album_info = {'_album' : albums[j],\
+                                  '_song': song,\
+                                  '_year' : years[j]}
+
+                # Insert album name, song, and year released into mongo database
+                db_insert_lyrics(database_name, collection_name, all_album_info)
             else:
                 j+=1
                 continue
+
+        # Return collection for further QC
+        collection = connect_to_mongo(database_name,\
+                                      collection_name)
+        return collection
+
+
 
 def connect_to_mongo(database_name, collection_name):
     ''' Connect to Mongo database
@@ -84,8 +98,8 @@ def connect_to_mongo(database_name, collection_name):
     database = client[database_name]
 
     # Access/Initialize Table
-    lyric_collection = database[collection_name]
-    return lyric_collection
+    album_collection = database[collection_name]
+    return album_collection
 
 
 def db_insert_album_info(database_name, collection_name, album_info):
@@ -99,10 +113,10 @@ def db_insert_album_info(database_name, collection_name, album_info):
     # Connect to and initialize mongo database
     collection = connect_to_mongo(database_name,collection_name)
 
-    # Insert new song lyrics into mongo database
-    collection.insert_one(all_lyrics)
+    # Insert new song's album info into mongo database
+    collection.insert_one(album_info)
 
 
 if __name__ == '__main__':
     soup = get_soup()
-    album_song_list_generator(soup)
+    collection = album_song_list_generator(soup)

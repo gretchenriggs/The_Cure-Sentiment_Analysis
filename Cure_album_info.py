@@ -41,21 +41,23 @@ def album_song_list_generator(soup):
         # Grabbing all album titles from BeautifulSoup object
         albums = soup.findAll("b")
 
+        # Reformatting albums and songs to remove html elements and make lower case
+        albums = [str(album).replace("<b>", "")\
+        .replace("</b>", "")\
+        .replace('"','')\
+        .lower() for album in albums]
+
         # Grabbing all song titles from BeautifulSoup object
         songs = soup.findAll("a")[32:-10]
 
         # Grabbing year for each album from BeautifulSoup object
         years = soup.findAll("div", {"class":"album"})[0:15]
-        for year in years:
+        for i, year in enumerate(years):
             year = str(year).split("</b> ")[1]\
                             .replace("(", "")\
                             .replace(")</div>","")
+            years[i] = year
 
-        # Reformatting albums and songs to remove html elements and make lower case
-        albums = [str(album).replace("<b>", "")\
-                             .replace("</b>", "")\
-                             .replace('"','')\
-                             .lower() for album in albums]
 
         album_song_dict = defaultdict(list)
         j = 0
@@ -64,7 +66,7 @@ def album_song_list_generator(soup):
                 song = str(song).split(">")[1]\
                 .replace("</a","")\
                 .lower()
-                print albums[j], year[j], song
+                print albums[j], years[j], song
                 album_song_dict[albums[j]].append(song)
 
                 # Format song and lyrics pymongo-style
@@ -73,7 +75,7 @@ def album_song_list_generator(soup):
                                   '_year' : years[j]}
 
                 # Insert album name, song, and year released into mongo database
-                db_insert_lyrics(database_name, collection_name, all_album_info)
+                db_insert_album_info(database_name, collection_name, all_album_info)
             else:
                 j+=1
                 continue

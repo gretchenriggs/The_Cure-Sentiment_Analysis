@@ -74,7 +74,8 @@ def song_list_generator(era_list, query=True):
 
                     song = str(soup.findAll("h3")[i+1])\
                                    .replace("<h3>", "")\
-                                   .replace("</h3>", "")
+                                   .replace("</h3>", "")\
+                                   .lower()
                     lyrics = reformated_song_lyrics[1:]
                     lyrics = " ".join(lyrics).lower()\
                                 .replace("  ", " ")\
